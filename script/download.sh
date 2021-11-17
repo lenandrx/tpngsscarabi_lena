@@ -12,5 +12,6 @@ for i in $echantillon
 do
 echo $i
 parallel-fastq-dump --sra-id $i --threads 8 --outdir data --split-files --gzip
+rm ${i}_3.fastq.gz #permet de supprimer tout de suite le troisième read
 done
 
