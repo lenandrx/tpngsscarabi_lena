@@ -4,4 +4,4 @@
 
 cd ~/mydatalocal/tpngsscarabi_lena/
 
-fastqc -o results/ -t 6 data/*.fastq.gz 
+fastqc -o results/fastqc_analysis/ -t 6 data/*.fastq.gz 
