@@ -79,6 +79,59 @@ Avec l'affiche de scarabiWT_filter, on voit que nous travaillons maintenant avec
 
 Pour avoir plus de détails sur le nombre de cellules contenues par échantillon : table(scarabiWT$orig.ident) 
 
+#Il faut maintenant normaliser les données 
+L'objectif est que la médiane d'expression entre les quatre echantillons soit la même, tout en gardant les rapports d'expression au sein de chaque échantillon; pour comparer ce qui est comparable. 
+
+```{r data normalization}
+scarabiWT_filter <- NormalizeData(scarabiWT_filter, normalization.method = "LogNormalize", scale.factor = 10000)
+```
+
+Ne pas s'intéresser aux gènes dont l'expression ne varie pas, ni aux gènes de "bruit". Le choix du nfeatures est légèrement difficile, on se met souvent à 10% du nombre de gènes totaux. Ici on va d'abord essayer avec 10 000 gènes, et on ajustera si nécessaire.  
+
+```{r Identification of highly variable features}
+scarabiWT_filter <- FindVariableFeatures(scarabiWT_filter, selection.method = "vst", nfeatures = 10000)
+
+# plot variable features with and without labels
+top10 <- head(VariableFeatures(scarabiWT_filter), 10)
+plot1 <- VariableFeaturePlot(scarabiWT_filter)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+CombinePlots(plots = list(plot1, plot2),nrow=2)
+```
+On fait maintenant une transformation linéaire : 
+
+```{r Scaling}
+all.genes <- rownames(scarabiWT_filter)
+scarabiWT_filter <- ScaleData(scarabiWT_filter, features = all.genes)
+```
+
+On fait maintenant la PCA: (l'UMAP se basera sur la PCA)
+
+```{r}
+scarabiWT_filter <- RunPCA(scarabiWT_filter, features = VariableFeatures(object = scarabiWT_filter))
+
+print(scarabiWT_filter[["pca"]], dims = 1:5, nfeatures = 5)
+```
+
+```{r}
+VizDimLoadings(scarabiWT_filter, dims = 1:2, reduction = "pca")
+```
+
+```{r}
+DimPlot(scarabiWT_filter, reduction = "pca")
+```
+La PCA donne des axes qui expliquent au mieux la variance du jeu de données. Les axes sont des combinaisons linéaires des gènes de départ, avec des poids différents. 
+
+On peut maintenant faire des Heat Maps  d'expression des gènes : 
+
+```{r}
+DimHeatmap(scarabiWT_filter, dims = 1, cells = 500, balanced = TRUE)
+
+#on représente les 500 cellules avec le plus de variations d'expression 
+```
+```{r}
+DimHeatmap(scarabiWT_filter, dims = 1:15, cells = 500, balanced = TRUE)
+```
+Là on visualise selon les 15 premiers axes : on remarque que très vite les axes ne représentent plus tant que ça la variance de l'expression. Cela peut notamment être expliqué par le fait que certains gènes co-varient (sont co-régulés), donc peuvent expliquer la variation selon un même axe. 
 ## Including Plots
 
 You can also embed plots, for example:
