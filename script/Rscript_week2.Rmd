@@ -1,0 +1,89 @@
+---
+title: "script_scarabi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## R Markdown
+
+```{r Load Data}
+library(Seurat)
+library(tximport)
+
+samps <- c("SRR8257100",
+"SRR8257101",
+"SRR8257102",
+"SRR8257103",
+"SRR8257104",
+"SRR8257105",
+"SRR8257106")
+
+```
+
+# path to the output directory of Alevin quant run 
+
+```{r matrice de compte}
+
+files <- file.path(
+  paste("~/mydatalocal/tpngsscarabi_lena/data/quant/",samps,"/alevin/quants_mat.gz", sep=""))
+file.exists(files)
+```
+
+```{r}
+txis <- lapply(files, function(f) tximport(files = f, type="alevin"))
+```
+# Il faut créer 4 objets Seurat indépendants pour les 4 échantillons de WT 
+On ne peut pas les compiler plus tôt car ils proviennent d'expériences indépendantes et donc peuvent contenir les mêmes identifiants. 
+Il faut donc les séparer et on les mergera ensuite. 
+
+avec min.cells = 3 on retire les gènes exprimés dans moins de 3 cellules 
+
+avec min.features = 200 on retire les cellules exprimant moins de 200 gènes 
+
+avec add.cell.ids = samps[1:4] on rend chaque cellule identifiée de manière unique 
+
+```{r création des objets Seurat}
+ s1 <- CreateSeuratObject(counts = txis[[1]]$counts , min.cells = 3, min.features = 200, project = samps[1])
+ s2 <- CreateSeuratObject(counts = txis[[2]]$counts , min.cells = 3, min.features = 200, project = samps[2])
+ s3 <- CreateSeuratObject(counts = txis[[3]]$counts , min.cells = 3, min.features = 200, project = samps[3])
+ s4 <- CreateSeuratObject(counts = txis[[4]]$counts , min.cells = 3, min.features = 200, project = samps[4])
+scarabiWT <- merge(s1, y = c(s2, s3,s4), add.cell.ids = samps[1:4], project = "scarabiWT")
+```
+
+```{r}
+scarabiWT[["percent.mt"]] <- PercentageFeatureSet(scarabiWT, pattern = "ATM")
+scarabiWT[["percent.chloro"]] <- PercentageFeatureSet(scarabiWT, pattern = "ATC")
+
+ VlnPlot(scarabiWT, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.chloro"), ncol = 4)
+```
+On remarque ici que les échantillons 100 et 101 ont anormalement beaucoup de gènes mitochondriaux et chloroplastiques : il faut qu'on sélectionne les cellules qui n'ont pas trop souffert. 
+Il serait intéressant de retirer les 5% de cellules les plus "mauvaises", avec le plus le gènes mitochondriaux exprimés; et mettre une valeur à 0.2 pour les chloroplastiques. 
+
+```{r threshold}
+thr_mt <- quantile(scarabiWT[["percent.mt"]]$percent.m, 0.95)
+thr_chloro <- scarabiWT[["percent.chloro"]]<0.2
+
+scarabiWT_filter <- subset(scarabiWT, subset = percent.chloro < 0.2 & percent.mt < thr_mt )
+```
+
+```{r graphs avec thr}
+VlnPlot(scarabiWT_filter, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.chloro"), ncol = 4)
+```
+Avec l'affiche de scarabiWT_filter, on voit que nous travaillons maintenant avec 11321 cellules, et 23443 gènes. 
+( Avant le filtre, on travaillait avec 11920 et 23443 gènes )
+
+Pour avoir plus de détails sur le nombre de cellules contenues par échantillon : table(scarabiWT$orig.ident) 
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
