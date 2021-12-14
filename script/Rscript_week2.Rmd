@@ -7,8 +7,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
-
 ## R Markdown
 
 ```{r Load Data}
@@ -27,14 +25,14 @@ samps <- c("SRR8257100",
 
 # path to the output directory of Alevin quant run 
 
-```{r matrice de compte}
+```{r matrice de compte, results="hide"}
 
 files <- file.path(
   paste("~/mydatalocal/tpngsscarabi_lena/data/quant/",samps,"/alevin/quants_mat.gz", sep=""))
 file.exists(files)
 ```
 
-```{r}
+```{r ,results="hide"}
 txis <- lapply(files, function(f) tximport(files = f, type="alevin"))
 ```
 # Il faut créer 4 objets Seurat indépendants pour les 4 échantillons de WT 
@@ -119,24 +117,55 @@ VizDimLoadings(scarabiWT_filter, dims = 1:2, reduction = "pca")
 ```{r}
 DimPlot(scarabiWT_filter, reduction = "pca")
 ```
+
 La PCA donne des axes qui expliquent au mieux la variance du jeu de données. Les axes sont des combinaisons linéaires des gènes de départ, avec des poids différents. 
 
 On peut maintenant faire des Heat Maps  d'expression des gènes : 
-
+On représente les 500 cellules avec le plus de variations d'expression 
 ```{r}
 DimHeatmap(scarabiWT_filter, dims = 1, cells = 500, balanced = TRUE)
 
-#on représente les 500 cellules avec le plus de variations d'expression 
+
 ```
 ```{r}
 DimHeatmap(scarabiWT_filter, dims = 1:15, cells = 500, balanced = TRUE)
 ```
 Là on visualise selon les 15 premiers axes : on remarque que très vite les axes ne représentent plus tant que ça la variance de l'expression. Cela peut notamment être expliqué par le fait que certains gènes co-varient (sont co-régulés), donc peuvent expliquer la variation selon un même axe. 
-## Including Plots
 
-You can also embed plots, for example:
+```{r, eval=FALSE, include=FALSE }
+scarabiWT_filter <- JackStraw(scarabiWT_filter, num.replicate = 100)
+scarabiWT_filter <- ScoreJackStraw(scarabiWT_filter, dims = 1:20)
+```
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+Le elbowplot range selon l'importance de la variance 
+
+```{r}
+ElbowPlot(scarabiWT_filter)
+```
+
+#Analyse par UMAP
+
+On cherche d'abord les voisins, puis les clusters 
+```{r}
+scarabiWT_filter <- FindNeighbors(scarabiWT_filter, dims = 1:10)
+scarabiWT_filter <- FindClusters(scarabiWT_filter, resolution = 0.5)
+```
+
+```{r}
+head(Idents(scarabiWT_filter), 5)
+```
+
+L'UMAP essaie de projeter sans trop perdre l'information : garder les clusters de cellules avec des expressions voisines; et garder la distance entre les clusters 
+
+```{r}
+scarabiWT_filter <- RunUMAP(scarabiWT_filter, dims = 1:10)
+```
+UMAP constructs a high dimensional graph representation of the data then optimizes a low-dimensional graph to be as structurally similar as possible. 
+L'UMAP calcule des distances euclidiennes entre cellules. 
+```{r UMAP Plot}
+DimPlot(scarabiWT_filter, reduction = "umap")
+```
+```{r Feature Plot}
+FeaturePlot(scarabiWT_filter, features = c("AT1G61590"))
 ```
 
