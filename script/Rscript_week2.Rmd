@@ -165,7 +165,79 @@ L'UMAP calcule des distances euclidiennes entre cellules.
 ```{r UMAP Plot}
 DimPlot(scarabiWT_filter, reduction = "umap")
 ```
+#Import des marqueurs de types cellulaires 
+
 ```{r Feature Plot}
-FeaturePlot(scarabiWT_filter, features = c("AT1G61590"))
+markers <- read.csv("~/mydatalocal/tpngsscarabi_lena/data/Markers.csv",sep="\t",h=T)
+```
+
+```{r Feature Plot}
+library(ggplot2)
+
+markers$Locus<-gsub(" ","",markers$Locus)
+mkcortex <- markers[markers$Preferential.expression.in.root=="Cortex",]$Locus
+mkendo <- markers[markers$Preferential.expression.in.root=="Endodermis",]$Locus
+mkatricho <- markers[markers$Preferential.expression.in.root=="Epidermis - Non-hair Cells (Atrichoblasts)",]$Locus
+mktricho <- markers[markers$Preferential.expression.in.root=="Epidermis - Root Hair Cells (Trichoblasts)",]$Locus
+mkepiandlatrootcap <- markers[markers$Preferential.expression.in.root=="Epidermis and Lateral Root Cap",]$Locus
+mkmeri <- markers[markers$Preferential.expression.in.root=="Meristem (Young) Endodermis/Cortex",]$Locus
+mkrootcap <- markers[markers$Preferential.expression.in.root=="Root Cap (Columella)",]$Locus
+mkstele <- markers[markers$Preferential.expression.in.root=="Stele (Young Vascular Tissue)",]$Locus
+
+fcortex <- FeaturePlot(scarabiWT_filter, features = mkcortex)
+ggsave(fcortex,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotcortex.png",width=40,height=20,unit="cm")
+
+fendo<- FeaturePlot(scarabiWT_filter,features = mkendo)
+ggsave(fendo,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotendo.png",width=40,height=20,unit="cm")
+
+fatricho <- FeaturePlot(scarabiWT_filter, features = mkatricho)
+ggsave(fatricho,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotatricho.png",width=40,height=20,unit="cm")
+
+ftricho <- FeaturePlot(scarabiWT_filter,features = mktricho)
+ggsave(ftricho,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plottricho.png",width=40,height=20,unit="cm")
+
+fepiandlatrootcap <- FeaturePlot(scarabiWT_filter,features = mkepiandlatrootcap)
+ggsave(fepiandlatrootcap,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotepiandlatrootcap.png",width=40,height=20,unit="cm")
+
+fmeri <- FeaturePlot(scarabiWT_filter,features = mkmeri)
+ggsave(fmeri,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotmeri.png",width=40,height=20,unit="cm")
+
+frootcap <- FeaturePlot(scarabiWT_filter,features = mkrootcap)
+ggsave(frootcap,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotrootcap.png",width=40,height=20,unit="cm")
+
+fstele <- FeaturePlot(scarabiWT_filter,features = mkstele)
+ggsave(fstele,file="~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/plotstele.png",width=40,height=20,unit="cm")
+
+```
+
+Après avoir fait à la main une image présentant l'UMAP d'expression de chaque gène associé au type cellulaire d'intérêt, on peut essayer de superposer l'expression de tous les gènes associés au même type cellulaire. 
+Dans un premier temps on modifie légèrement nos données (retirer les espaces en trop, retirer le slash dans le nom d'un type cellulaire). 
+Ensuite on crée (split) plusieurs tables, une pour chaque type cellulaire. 
+Ensuite on crée un dossier "superposition", vide, s'il n'est pas déjà créé (-p).
+Ensuite on retire les images si elles y sont déjà (-r). 
+
+Puis on recrée (avec une boucle) les images pour chaque type cellulaire, comme fait à la main dans le bloc précédent.
+
+Puis on crée le datascore qui fait la moyenne d'expression de tous les marqueurs d'un même type cellulaire pour chaque cellule, et on utilise ces données pour présenter une superposition de tous les marqueurs génétiques en un seul plot pour un type cellulaire donné. 
+
+Enfin, on met cette image contenant les 8 plots pour les 8 types cellulaires dans le dossier superposition. 
+
+```{r superposition des plots}
+Markers <- read.csv("~/mydatalocal/tpngsscarabi_lena/data/Markers.csv",sep="\t",h=T)
+Markers$Locus<-gsub(" ","",Markers$Locus)
+Markers$Preferential.expression.in.root<-gsub("/"," ",Markers$Preferential.expression.in.root)
+lm<-split(Markers,Markers$Preferential.expression.in.root)
+system("mkdir -p ~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/superposition")
+system("rm -r ~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/superposition/*")
+output <- lapply(names(lm),function(x){f<-FeaturePlot(scarabiWT_filter, features = lm[[x]]$Locus)
+  ggsave(f,file=paste0("~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/superposition/",x,".png"),width=40,height=40,units="cm")
+  })
+datascore <- data.frame(lapply(names(lm),function(x){score=colMeans(scarabiWT_filter@assays$RNA[lm[[x]]$Locus,])
+  }))
+names(datascore)<-make.names(names(lm))
+scarabiWT_filter <- AddMetaData(scarabiWT_filter, metadata = datascore)
+g<-FeaturePlot(scarabiWT_filter, features=names(datascore))
+ggsave(g,file = "~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/superposition/type_cellulaire.png",width=40,height=40,units="cm")
+
 ```
 
