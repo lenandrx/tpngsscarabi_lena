@@ -17,8 +17,5 @@ salmon index -t data/arabidopsis_transcriptome.fa -p 8 -k 31 -i data_processed/i
 # on sélectionne les identifiants seulement avec les substr, sans les guillemets etc
 # on met ce qu'on obtient dans le fichier txp2gene qui se trouve dans le dossier data_processed
 
-bioawk -c gff '$feature=="exon" {print $9}' < data/arabidopsis_transcriptome.gtf \
-  | awk -F ' ' '{print substr($2,2,length($2)-3) "\t" substr($4,2,length($4)-3)}' - > data_processed/txp2gene.tsv
-
-
+bioawk -c gff '$feature=="exon" {print $9}' < data/arabidopsis_transcriptome.gtf | awk -F " " '{print substr($2,2,length($2)-3) "\t" substr($4,2,length($4)-3)}' > data_processed/txp2gene.tsv
 
