@@ -12,6 +12,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r Load Data}
 library(Seurat)
 library(tximport)
+#install.packages("corrplot")
+library(corrplot)
+#install.packages("network")
+library(network)
 
 samps <- c("SRR8257100",
 "SRR8257101",
@@ -135,6 +139,7 @@ Là on visualise selon les 15 premiers axes : on remarque que très vite les axe
 ```{r, eval=FALSE, include=FALSE }
 scarabiWT_filter <- JackStraw(scarabiWT_filter, num.replicate = 100)
 scarabiWT_filter <- ScoreJackStraw(scarabiWT_filter, dims = 1:20)
+JackStrawPlot(scarabiWT_filter, dims = 1:15,xmax=1,ymax=1)
 ```
 
 Le elbowplot range selon l'importance de la variance 
@@ -239,5 +244,75 @@ scarabiWT_filter <- AddMetaData(scarabiWT_filter, metadata = datascore)
 g<-FeaturePlot(scarabiWT_filter, features=names(datascore))
 ggsave(g,file = "~/mydatalocal/tpngsscarabi_lena/results/plot_umap_markers/superposition/type_cellulaire.png",width=40,height=40,units="cm")
 
+```
+
+
+## Deuxième méthode pour étudier les types cellulaires 
+
+On commence par importer les données brutes obtenues par dissection de chaque type cellulaire dans un document bash intitulé data_markers (deuxième import) 
+Puis on travaille avec les transcriptomes purs de chaque type cellulaire. Pour récupérer les identifiants des échantillons (les "samps"), on va chercher dans les métadatas dont la première colonne présente tous les identifiants. 
+
+```{r Downloading metadata to get all sample names}
+samps2 <- read.table("~/mydatalocal/tpngsscarabi_lena/data/flower.ens-lyon.fr/tp_ngs/scarabi/Li2016/metadata_Li2016.txt",sep="\t")
+samps2 <- samps2[order(samps2$V3),] #on ordonne selon le type cellulaire 
+# on veut aussi supprimer les types non informatifs pour notre étude : les whole root et les traitements cycloheximide 
+rm_cell_type <- c("whole root", "whole root 1", "cycloheximide mock", "cycloheximide treatment")
+samps2 <- samps2[!(samps2$V3%in%rm_cell_type),]
+head(samps2)
+namesech<-samps2$V1
+namesech
+```
+
+```{r Récupérer le path de chaque fichier quant.sf et sélectionner ceux qui existent}
+files <- file.path(
+  paste("~/mydatalocal/tpngsscarabi_lena/data/Counts_Salmon/",namesech,"/quant.sf", sep=""))
+file.exists(files)
+files<-files[file.exists(files)]
+```
+
+On a ici récupéré les tables de Counts_Salmon qui contiennent les niveaux d'expression de chaque transcrit. Il faut maintenant retourner sur notre table de correspondance de transcriptome à gène pour associer l'ensemble des transcrits d'un même gène ensemble.
+
+```{r Récupérer tx2gene}
+
+txp2gene<-read.table("~/mydatalocal/tpngsscarabi_lena/data_processed/txp2gene.tsv")
+names(txp2gene)<-c("TXNAME","GENEID")
+txp2gene<-unique(txp2gene) #ne garder que les lignes unique, pas les répétées
+head(txp2gene)
+
+```
+On peut maintenant associer (/compiler) tous les transcrits correspondant au même gène pour avoir le niveau global d'expression de ce gène. 
+lapply va rendre une liste que l'on convertira en table 
+
+```{r}
+#Créer un tableau avec l'expression de chaque gène dans chacun des échantillons qu'on a téléchargé ce matin
+txis <- lapply(files, function(f) {
+  tab<- tximport(files = f, type="salmon", tx2gene=txp2gene)
+  return(tab$abundance)
+  })
+tabpur<-as.data.frame(txis) #tables d'expression dans les tissus purs, disséqués 
+
+#Obtenir le nom des échantillons pour le tableau
+namesech2=sapply(files,function(f){strsplit(f,"/")[[1]][6]})
+
+#Changer le nom des colonnes du tableau 
+names(tabpur)<-make.names(namesech2)
+head(tabpur)
+```
+
+```{r}
+avg.e <- AverageExpression(scarabiWT_filter)
+scarabiWT_avg=data.frame(avg.e)
+genes_scarabi <- rownames(scarabiWT_avg)
+genes_li <- rownames(tabpur)
+genes_common <- genes_scarabi[genes_scarabi%in%genes_li]
+
+tabpur_c <- tabpur[genes_common,]
+scarabiWT_avg_c <- scarabiWT_avg[genes_common,]
+
+corLi_scarab_spearman <- cor(scarabiWT_avg_c,tabpur_c,method="spearman")
+
+colnames(corLi_scarab_spearman) <- lapply(colnames(corLi_scarab_spearman), function(name){samps2[samps2$V1==name,3]}) # on renomme les colonnes pour qu'elles prennent le nom des types cellulaires plutôt que le nom des échantillons 
+
+corrplot(corLi_scarab_spearman, method="color", is.corr=F,tl.col=as.color(colnames(corLi_scarab_spearman))) 
 ```
 
